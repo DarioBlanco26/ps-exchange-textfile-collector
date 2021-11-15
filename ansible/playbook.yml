@@ -1,0 +1,11 @@
+---
+- name: configure_install
+  hosts: all
+  vars_prompt:
+    - name: username
+      prompt: "Username"
+      private: no
+    - name: password
+      prompt: "Password"
+  roles:
+  - exchange

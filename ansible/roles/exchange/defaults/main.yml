@@ -1,0 +1,5 @@
+---
+# defaults file for windows
+puppet_master: puppet_master_fqdn
+exchange_user: Administrador
+puppet_class: exchange

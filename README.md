@@ -1,1 +1,0 @@
-# ps-exchange-textfile-collector

@@ -1,0 +1,90 @@
+---
+- name: Copy puppet manifest file
+  delegate_to: '{{ puppet_master }}'  
+  copy:
+    src: files/puppet/exchange.pp
+    dest: /etc/puppetlabs/code/environments/{{puppet_env}}/modules/so_puppet_windows/manifests
+  become: true
+  become_user: root
+
+- name: Change manifest file ownership, group and permissions 
+  delegate_to: '{{ puppet_master }}'
+  file:
+    path: /etc/puppetlabs/code/environments/{{puppet_env}}/modules/so_puppet_windows/manifests/exchange.pp
+    owner: apache
+    group: root
+    mode: '0755'
+  become: true
+  become_user: root
+
+- name: Copy textfile collector to puppet_master
+  delegate_to: '{{ puppet_master }}'
+  copy:
+    src: files/exporter/exchange.ps1
+    dest: /etc/puppetlabs/code/environments/{{puppet_env}}/modules/so_puppet_windows/files
+  become: true
+  become_user: root
+
+- name: Change exporter file ownership, group and permissions 
+  delegate_to: '{{ puppet_master }}'
+  file:
+    path: /etc/puppetlabs/code/environments/{{puppet_env}}/modules/so_puppet_windows/files/exchange.ps1
+    owner: apache
+    group: root
+    mode: '0755'
+  become: true
+  become_user: root
+
+- name: Copy exchange.ps1
+  win_copy:
+    src: files/exporter/exchange.ps1
+    dest: C:\scripts\
+
+- name: Set file permission
+  win_file:
+    path: C:\scripts\exchange.ps1
+    owner: Administrador
+    group: Administradores
+
+- name: Install Windows Scheduled Task  
+  win_scheduled_task:
+    name: Windows_exporter exchange textfile collector
+    description: The textfile collector exposes metrics from files written by other processes.
+    actions:
+    - path: powershell.exe
+      arguments: -command ".'C:\Program Files\Microsoft\Exchange Server\V15\Bin\RemoteExchange.ps1';Connect-ExchangeServer -auto -ClientApplication:ManagementShell ;Invoke-Expression -Command 'C:\scripts\exchange.ps1'"
+    multiple_instances: 3
+    triggers:
+    - type: daily
+      start_boundary: '2021-05-31T17:00:00'
+      repetition:
+        interval: PT1M
+    logon_type: password
+    username: '{{exchange_user}}'
+    password: '{{exchange_user_password}}'
+    run_level: highest
+    state: present
+    enabled: yes
+
+- name: Import class to satellite
+  delegate_to: '{{ puppet_master }}'
+  shell: hammer proxy import-classes --puppet-environment '{{puppet_env}}' --id 1
+  become: true
+  become_user: root
+  register: issue_host
+  until: issue_host.failed == false
+  retries: 3
+  delay: 5
+  ignore_errors: yes
+
+- name: Add puppet class to a host
+  delegate_to: '{{ puppet_master }}'
+  shell: hammer host update --name '{{ ansible_fqdn }}' --puppet-classes '{{ puppet_class }}'
+  become: true
+  become_user: root
+  register: issue_host
+  until: issue_host.failed == false
+  retries: 3
+  delay: 5
+  ignore_errors: yes
+
